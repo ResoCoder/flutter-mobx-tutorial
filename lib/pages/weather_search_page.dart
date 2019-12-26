@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:flutter_mobx_tutorial/data/model/weather.dart';
+import 'package:flutter_mobx_tutorial/state/weather_store.dart';
+import 'package:mobx/mobx.dart';
+import 'package:provider/provider.dart';
 
 class WeatherSearchPage extends StatefulWidget {
   @override
@@ -7,17 +11,56 @@ class WeatherSearchPage extends StatefulWidget {
 }
 
 class _WeatherSearchPageState extends State<WeatherSearchPage> {
+  WeatherStore _weatherStore;
+  List<ReactionDisposer> _disposers;
+  GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey();
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _weatherStore ??= Provider.of<WeatherStore>(context);
+    _disposers ??= [
+      reaction(
+        (_) => _weatherStore.errorMessage,
+        (String message) {
+          _scaffoldKey.currentState.showSnackBar(
+            SnackBar(
+              content: Text(message),
+            ),
+          );
+        },
+      ),
+    ];
+  }
+
+  @override
+  void dispose() {
+    _disposers.forEach((d) => d());
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
         title: Text("Weather Search"),
       ),
       body: Container(
         padding: EdgeInsets.symmetric(vertical: 16),
         alignment: Alignment.center,
-        // TODO: Implement with MobX
-        child: buildInitialInput(),
+        child: Observer(
+          builder: (_) {
+            switch (_weatherStore.state) {
+              case StoreState.initial:
+                return buildInitialInput();
+              case StoreState.loading:
+                return buildLoading();
+              case StoreState.loaded:
+                return buildColumnWithData(_weatherStore.weather);
+            }
+          },
+        ),
       ),
     );
   }
@@ -74,6 +117,7 @@ class CityInputField extends StatelessWidget {
   }
 
   void submitCityName(BuildContext context, String cityName) {
-    // TODO: Get weather for the city
+    final weatherStore = Provider.of<WeatherStore>(context);
+    weatherStore.getWeather(cityName);
   }
 }
